@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goserver
+  labels:
+    app: goserver
+spec: 
+  strategy:
+    type: Recreate  # Estratégia de rollout - recria todas as instâncias
+  selector:
+    matchLabels:
+      app: goserver
+  replicas: 1  # Número de réplicas desejadas
+
+  template:
+    metadata:
+      labels:
+        app: goserver
+    spec:
+      containers:
+        - name: goserver
+          image: "luiszkm/hello-go:v5.2"  # Imagem do contêiner
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 20Mi
+            limits:
+              cpu: 100m
+              memory: 30Mi
+
+          startupProbe:  # Verifica se o contêiner iniciou com sucesso
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 3
+            failureThreshold: 10
+
+          readinessProbe:  # Verifica se o contêiner está pronto para receber tráfego
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 3
+            failureThreshold: 1
+
+          livenessProbe:  # Verifica se o contêiner está em execução
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 1
+            successThreshold: 1
+
+## ConfigMap e Secret para fazer leitura de variáveis
+          envFrom:
+            - configMapRef:
+                name: goserver-env  # Referência ao ConfigMap
+            - secretRef:
+                name: goserver-secret  # Referência ao Secret
+          volumeMounts:
+            - name: config
+              mountPath: /go/myfamily
+              readOnly: true
+            - name: goserver-pvc 
+              mountPath: /go/pvc
+
+## Volume para fazer leitura de  arquivo
+      volumes:
+        - name: goserver-pvc
+          persistentVolumeClaim:
+            claimName: goserver-pvc  # Nome da reivindicação do PersistentVolume
+        - name: config 
+          configMap:
+            name: configmap-family  # Nome do ConfigMap
+            items:
+              - key: members
+                path: family.txt  # Caminho dentro do contêiner onde o arquivo será montado
